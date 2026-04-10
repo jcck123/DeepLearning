@@ -1,6 +1,6 @@
 .DS_Store
 .idea/
-data/
+/data/
 CHB-MIT-main/
 __pycache__/
 *.pyc
