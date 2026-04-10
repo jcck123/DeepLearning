@@ -10,14 +10,14 @@ pip install mne pyedflib pyyaml scipy torch torchvision scikit-learn matplotlib
 
 ```bash
 pip install awscli
-aws s3 sync --no-sign-request s3://physionet-open/chbmit/1.0.0/ /Volumes/T9/data/raw/ ！！！改成你的下载位置
+aws s3 sync --no-sign-request s3://physionet-open/chbmit/1.0.0/ /Volumes/T9/data/raw/  # Change to your download path
 ```
 
 ## Step 2: Inspect & Clean
 
 ```bash
-python data_pipeline.py inspect --data-dir /Volumes/T9/data/raw !!!你的下载位置
-python data_pipeline.py clean --data-dir /Volumes/T9/data/raw ！！！你的下载位置
+python data_pipeline.py inspect --data-dir /Volumes/T9/data/raw  # Your download path
+python data_pipeline.py clean --data-dir /Volumes/T9/data/raw  # Your download path
 ```
 
 Results: 24 patients, 683/686 files usable, 198 seizures, 983h recording. 3 files excluded (chb12_27/28/29, non-standard montage, 13 seizures lost).
@@ -26,8 +26,8 @@ Results: 24 patients, 683/686 files usable, 198 seizures, 983h recording. 3 file
 
 ```bash
 python preprocess.py \
-  --raw-dir /Volumes/T9/data/raw \ ！！！下载位置
-  --out-dir /Volumes/T9/data/processed \ ！！！下载位置
+  --raw-dir /Volumes/T9/data/raw \   # Your download path
+  --out-dir /Volumes/T9/data/processed \  # Your download path
   --stride-sec 30
 ```
 

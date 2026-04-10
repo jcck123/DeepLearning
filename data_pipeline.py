@@ -1,13 +1,4 @@
-#!/usr/bin/env python3
-"""
 
-Usage:
-  python data_pipeline.py download                         # 下载全部24个case
-  python data_pipeline.py download --patients chb01 chb02  # 下载指定case
-  python data_pipeline.py inspect                          # 检查所有文件
-  python data_pipeline.py clean                            # 生成排除列表
-  python data_pipeline.py all                              # 全部执行
-"""
 import os
 import re
 import sys
@@ -38,10 +29,8 @@ DATA_DIR = "data/raw"
 REPORT_DIR = "data/reports"
 
 
-# ── Step 1: Download ────────────────────────────────────────────────
 
 def _list_files_from_index(index_url):
-    """从PhysioNet目录索引页解析出文件名列表。"""
     import urllib.request
     import ssl
     from html.parser import HTMLParser
@@ -70,7 +59,6 @@ def _list_files_from_index(index_url):
 
 
 def _download_file(url, dest_path, max_retries=3):
-    """下载单个文件，失败自动重试，返回 (filename, success, detail)。"""
     import urllib.request
     import ssl
     import time
@@ -105,10 +93,7 @@ def _download_file(url, dest_path, max_retries=3):
 
 
 def download(data_dir=DATA_DIR, patients=None, workers=4):
-    """
-    从PhysioNet并发下载。先收集所有病人的文件列表，然后统一并发下载。
-    比逐个病人下载快很多。
-    """
+
     from concurrent.futures import ThreadPoolExecutor, as_completed
 
     out = Path(data_dir)
@@ -120,7 +105,6 @@ def download(data_dir=DATA_DIR, patients=None, workers=4):
     print(f"  Workers: {workers}")
     print("=" * 60)
 
-    # Phase 1: 收集所有需要下载的文件
     all_tasks = []  # (url, dest_path, patient_id)
     for pid in patients:
         pdir = out / pid
@@ -148,14 +132,12 @@ def download(data_dir=DATA_DIR, patients=None, workers=4):
         return
 
     total = len(all_tasks)
-    # 预估：跳过已存在的
     to_download = sum(1 for _, dest, _ in all_tasks
                       if not (dest.exists() and dest.stat().st_size > 0))
     print(f"\n  Total: {total} files ({to_download} to download, "
           f"{total - to_download} already exist)")
     print(f"  Starting {workers}-thread download...\n")
 
-    # Phase 2: 并发下载全部
     done = 0
     ok = 0
     failed = 0
@@ -176,7 +158,6 @@ def download(data_dir=DATA_DIR, patients=None, workers=4):
                 failed += 1
                 print(f"  [{done}/{total}] ERR {pid}/{name}: {detail}")
 
-    # 统计
     print(f"\nDownload complete: {ok} ok, {failed} failed, {total - ok - failed} skipped")
     for pid in patients:
         pdir = out / pid
@@ -187,14 +168,8 @@ def download(data_dir=DATA_DIR, patients=None, workers=4):
     print()
 
 
-# ── Step 2: Inspect ─────────────────────────────────────────────────
 
 def parse_summary(path):
-    """
-    解析summary文件。
-    兼容 "Seizure Start Time" / "Seizure 1 Start Time" / "Seizure1 Start Time"
-    返回 {filename: [(start_s, end_s), ...]}
-    """
     seizures = defaultdict(list)
     if not os.path.exists(path):
         return dict(seizures)
@@ -228,10 +203,6 @@ def parse_summary(path):
 
 
 def inspect_edf(filepath):
-    """
-    检查单个EDF文件，返回元数据dict。
-    用mne读取（对CHB-MIT兼容性最好）。
-    """
     info = {
         'filename': os.path.basename(filepath),
         'valid': False,
@@ -246,13 +217,10 @@ def inspect_edf(filepath):
         ch_names = [ch.strip() for ch in raw.ch_names]
         sfreq = raw.info['sfreq']
         duration = raw.n_times / sfreq
-
-        # 标准化通道名，匹配标准18通道
         ch_norm = {ch.replace(' ', '').replace('-', '-').upper() for ch in ch_names}
         present = ch_norm & STANDARD_18_NORM
         missing = STANDARD_18_NORM - ch_norm
 
-        # 识别非EEG通道
         non_eeg = [ch for ch in ch_names
                    if ch.strip() in ('-', '--', '.', '')
                    or ch.strip().upper() in ('ECG', 'EKG', 'VNS')]
@@ -277,7 +245,6 @@ def inspect_edf(filepath):
 
 
 def inspect(data_dir=DATA_DIR):
-    """检查所有case的所有EDF文件，打印报告。"""
     root = Path(data_dir)
     pdirs = sorted(d for d in root.iterdir() if d.is_dir() and d.name.startswith("chb"))
 
@@ -293,17 +260,12 @@ def inspect(data_dir=DATA_DIR):
 
     for pdir in pdirs:
         pid = pdir.name
-
-        # 找summary文件（过滤macOS ._隐藏文件）
         summaries = [s for s in pdir.rglob("*summary*") if not s.name.startswith('._')]
         seizure_map = parse_summary(str(summaries[0])) if summaries else {}
-
-        # 找所有edf（去重，过滤macOS ._隐藏文件）
         edfs_all = sorted(pdir.rglob("*.edf"))
         seen_names = set()
         edfs = []
         for e in edfs_all:
-            # 跳过 macOS 元数据文件 (._xxx.edf) 和 .seizures 文件
             if e.name.startswith('._') or '.seizures' in e.name:
                 continue
             if e.name not in seen_names:
@@ -354,7 +316,7 @@ def inspect(data_dir=DATA_DIR):
         }
         reports[pid] = report
 
-        # 打印状态
+        # print
         flag = "!!" if n_bad > 0 else "OK"
         print(f"  [{flag}] {pid}: {n_valid}/{len(edfs)} ok, "
               f"{total_sz} seizures, {total_h:.1f}h"
@@ -363,7 +325,6 @@ def inspect(data_dir=DATA_DIR):
             for iss in fi['file_issues']:
                 print(f"       {fi['filename']}: {iss}")
 
-    # 癫痫分布
     print(f"\n{'─' * 60}")
     print("SEIZURE DISTRIBUTION:")
     for pid in sorted(reports, key=lambda p: reports[p]['total_seizures'], reverse=True):
@@ -381,10 +342,8 @@ def inspect(data_dir=DATA_DIR):
     return reports
 
 
-# ── Step 3: Clean ───────────────────────────────────────────────────
 
 def clean(data_dir=DATA_DIR, report_dir=REPORT_DIR, reports=None):
-    """分析检查结果，生成排除列表。"""
     if reports is None:
         reports = inspect(data_dir)
     if not reports:
@@ -421,7 +380,6 @@ def clean(data_dir=DATA_DIR, report_dir=REPORT_DIR, reports=None):
     excluded_patients = [pid for pid, s in patient_stats.items()
                          if s['usable_files'] == 0]
 
-    # 构造输出
     result = {
         'generated': datetime.now().isoformat(),
         'same_patient_pairs': SAME_PATIENT,
@@ -452,7 +410,7 @@ def clean(data_dir=DATA_DIR, report_dir=REPORT_DIR, reports=None):
             reasons = "; ".join(e['reasons'])
             sz_tag = f" [LOSES {e['seizures_lost']} sz!]" if e['seizures_lost'] else ""
             print(f"    {e['patient']}/{e['filename']}: {reasons}{sz_tag}")
-    print(f"\n  REMINDER: chb01 == chb21 (同一病人，必须在同一个split!)")
+    print(f"\n  REMINDER: chb01 == chb21 (same patient, must be in the same split!)")
 
     out = Path(report_dir)
     out.mkdir(parents=True, exist_ok=True)
@@ -501,7 +459,7 @@ def main():
     parser.add_argument("--report-dir", default=REPORT_DIR)
     parser.add_argument("--patients", nargs="+", default=None)
     parser.add_argument("--workers", type=int, default=4,
-                        help="并行下载线程数 (default: 4)")
+                        help="Number of parallel download threads (default: 4)")
     args = parser.parse_args()
 
     if args.step in ("download", "all"):

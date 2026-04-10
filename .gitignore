@@ -1,0 +1,12 @@
+.DS_Store
+.idea/
+data/
+CHB-MIT-main/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+*.npy
+*.pt

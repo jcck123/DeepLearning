@@ -1,21 +1,4 @@
 #!/usr/bin/env python3
-"""
-Patient-level Train/Val/Test Split
-===================================
-按病人分组，不能让同一病人的数据出现在不同集中（防止数据泄露）。
-
-策略:
-  - 癫痫少的病人 → 训练集（学习更稳定）
-  - 中等的 → 验证集（调参）
-  - 多的 → 测试集（评估更可靠）
-  - chb01 和 chb21 是同一个人，必须放在一起
-
-默认分配: 18 训练 / 3 验证 / 3 测试
-
-Usage:
-  python split.py --processed-dir /Volumes/T9/data/processed
-  python split.py --processed-dir /Volumes/T9/data/processed --out-dir /Volumes/T9/data/splits
-"""
 
 import os
 import json
@@ -27,7 +10,6 @@ SAME_PATIENT = [('chb01', 'chb21')]
 
 
 def load_patient_stats(processed_dir):
-    """读取每个病人的预处理统计信息。"""
     stats = {}
     root = Path(processed_dir)
 
@@ -62,23 +44,16 @@ def load_patient_stats(processed_dir):
 
 
 def create_split(stats, n_train=18, n_val=3, n_test=3, seed=42):
-    """
-    按癫痫数量排序后分组。
-    chb01 和 chb21 必须在同一个 split。
-    """
     rng = np.random.RandomState(seed)
 
-    # 排除没有 preictal 数据的病人
     valid = {pid: s for pid, s in stats.items() if s['n_preictal'] > 0}
     excluded = [pid for pid in stats if pid not in valid]
 
     if excluded:
         print(f"  Excluded (no preictal): {excluded}")
 
-    # 按 preictal 数量升序排列
     sorted_pids = sorted(valid.keys(), key=lambda p: valid[p]['n_preictal'])
 
-    # 调整数量
     total_needed = n_train + n_val + n_test
     if len(sorted_pids) < total_needed:
         print(f"  Warning: only {len(sorted_pids)} valid patients, need {total_needed}")
@@ -88,12 +63,12 @@ def create_split(stats, n_train=18, n_val=3, n_test=3, seed=42):
         n_val = max(1, int(len(sorted_pids) * ratio_v))
         n_test = len(sorted_pids) - n_train - n_val
 
-    # 分三组: 少→训练, 中→验证, 多→测试
+    # Split into three groups: fewest preictal -> train, mid -> val, most -> test
     train_pids = sorted_pids[:n_train]
     val_pids = sorted_pids[n_train:n_train + n_val]
     test_pids = sorted_pids[n_train + n_val:n_train + n_val + n_test]
 
-    # 组内随机打乱
+    # Shuffle within each group
     rng.shuffle(train_pids)
     rng.shuffle(val_pids)
     rng.shuffle(test_pids)
@@ -105,12 +80,10 @@ def create_split(stats, n_train=18, n_val=3, n_test=3, seed=42):
         'excluded': sorted(excluded),
     }
 
-    # 强制 chb01 和 chb21 在同一组
     for p1, p2 in SAME_PATIENT:
         if p1 not in valid or p2 not in valid:
             continue
 
-        # 找到两个人分别在哪个组
         p1_set = None
         p2_set = None
         for set_name in ['train', 'val', 'test']:
@@ -119,7 +92,6 @@ def create_split(stats, n_train=18, n_val=3, n_test=3, seed=42):
             if p2 in split[set_name]:
                 p2_set = set_name
 
-        # 如果不在同一组，把 p2 移到 p1 的组
         if p1_set and p2_set and p1_set != p2_set:
             split[p2_set].remove(p2)
             split[p1_set].append(p2)
@@ -130,7 +102,7 @@ def create_split(stats, n_train=18, n_val=3, n_test=3, seed=42):
 
 
 def print_split(split, stats):
-    """打印分组详情。"""
+    """Print split details."""
     print(f"\n{'=' * 60}")
     print("PATIENT SPLIT")
     print(f"{'=' * 60}")
@@ -148,7 +120,6 @@ def print_split(split, stats):
         if total_win > 0:
             print(f"    Preictal ratio: {100*total_pre/total_win:.1f}%")
 
-        # 逐病人详情
         for pid in pids:
             s = stats.get(pid, {})
             print(f"      {pid}: {s.get('n_windows', 0)} win, "
@@ -158,7 +129,7 @@ def print_split(split, stats):
     if split.get('excluded'):
         print(f"\n  EXCLUDED: {split['excluded']}")
 
-    # 检查 chb01/chb21
+    # Check chb01/chb21 same-patient constraint
     for p1, p2 in SAME_PATIENT:
         for set_name in ['train', 'val', 'test']:
             has_p1 = p1 in split[set_name]
@@ -172,9 +143,9 @@ def print_split(split, stats):
 def main():
     parser = argparse.ArgumentParser(description="Patient-level split")
     parser.add_argument("--processed-dir", required=True,
-                        help="预处理数据目录")
+                        help="Preprocessed data directory")
     parser.add_argument("--out-dir", default=None,
-                        help="输出目录 (默认: <processed-dir>/../splits)")
+                        help="Output directory (default: <processed-dir>/../splits)")
     parser.add_argument("--n-train", type=int, default=18)
     parser.add_argument("--n-val", type=int, default=3)
     parser.add_argument("--n-test", type=int, default=3)
@@ -194,7 +165,7 @@ def main():
 
     print_split(split, stats)
 
-    # 保存
+    # Save
     output = {
         'seed': args.seed,
         'split': split,
