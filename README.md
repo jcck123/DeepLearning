@@ -37,11 +37,6 @@ python preprocess.py \
 python split.py --processed-dir /Volumes/T9/data/processed
 ```
 
-## Step 5: Train (TODO)
-
-
-
-## Step 6: Evaluate (TODO)
 
 
 ---
