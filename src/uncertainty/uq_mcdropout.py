@@ -12,7 +12,11 @@ from torch import nn
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from train_cnn_lstm import (
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+
+from train import (
     CHBMITSequenceDataset,
     CNNLSTMSeizurePredictor,
     find_best_threshold,

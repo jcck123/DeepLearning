@@ -1,0 +1,148 @@
+\documentclass[11pt]{article}
+\usepackage[a4paper, margin=2.5cm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{enumitem}
+\usepackage{booktabs}
+\usepackage{verbatim}
+\usepackage{hyperref}
+
+\title{Instruction for Reproducing Results\\[4pt]
+\large COMP0197 Applied Deep Learning -- Team 09}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section{Environment}
+
+All code was developed and tested under the \texttt{comp0197-pt} micromamba environment. The following three additional packages are required beyond the base environment:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lll}
+\toprule
+Package & Version & Purpose \\
+\midrule
+\texttt{mne} & 1.6.0 & EEG data loading and filtering \\
+\texttt{tqdm} & 4.66.1 & Progress bars during training/evaluation \\
+\texttt{scikit-learn} & 1.3.2 & Metrics, calibration, and data splitting \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent Install with:
+\begin{verbatim}
+pip install mne==1.6.0 tqdm==4.66.1 scikit-learn==1.3.2
+\end{verbatim}
+
+\section{Project Structure}
+
+\begin{verbatim}
+.
+├── train.py                    # Main training entry point
+├── test.py                     # Main evaluation entry point
+├── saved_models/               # Trained model weights
+│   └── best_model.pt
+├── src/
+│   ├── models/                 # CNN, CNN-LSTM, Deep Ensemble training
+│   ├── preprocessing/          # Data pipeline, preprocessing, splitting
+│   ├── uncertainty/            # MC Dropout, calibration, ensemble UQ
+│   └── data/                   # Feature extraction and data loading
+├── requirements.txt
+└── instruction.pdf
+\end{verbatim}
+
+\section{Data Preparation}
+
+\subsection{Step 1: Download CHB-MIT Dataset}
+
+Download the raw EEG data (\textasciitilde42\,GB) from PhysioNet:
+
+\begin{verbatim}
+pip install awscli
+aws s3 sync --no-sign-request \
+    s3://physionet-open/chbmit/1.0.0/ \
+    /path/to/data/raw/
+\end{verbatim}
+
+\subsection{Step 2: Inspect and Clean}
+
+\begin{verbatim}
+python src/preprocessing/data_pipeline.py inspect \
+    --data-dir /path/to/data/raw
+python src/preprocessing/data_pipeline.py clean \
+    --data-dir /path/to/data/raw
+\end{verbatim}
+
+\subsection{Step 3: Preprocess}
+
+\begin{verbatim}
+python src/preprocessing/preprocess.py \
+    --raw-dir /path/to/data/raw \
+    --out-dir /path/to/data/processed \
+    --stride-sec 30
+\end{verbatim}
+
+This produces 115{,}330 windows (30\,s each, 18 channels, 256\,Hz) stored as \texttt{.npy} files per patient.
+
+\subsection{Step 4: Create Balanced Patient-level Split}
+
+\begin{verbatim}
+python src/preprocessing/make_balanced_split.py \
+    --processed-dir /path/to/data/processed
+\end{verbatim}
+
+Output: \texttt{patient\_split\_balanced.json} (18 train / 3 val / 3 test patients).
+
+\section{Reproducing Results}
+
+\subsection{Step 5: Train the CNN+LSTM Model}
+
+\begin{verbatim}
+python train.py \
+    --processed-dir /path/to/data/processed \
+    --split-file /path/to/patient_split_balanced.json \
+    --out-dir saved_models/ \
+    --seq-len 6 --seq-stride 2 \
+    --epochs 12 --batch-size 4 \
+    --lr 1e-4 --weight-decay 1e-4 \
+    --dropout 0.3 --patience 6
+\end{verbatim}
+
+The best checkpoint is saved as \texttt{saved\_models/best\_model.pt} based on validation AUPRC.
+
+\subsection{Step 6: Evaluate on Test Set}
+
+\begin{verbatim}
+python test.py \
+    --model-path saved_models/best_model.pt \
+    --processed-dir /path/to/data/processed \
+    --split-file /path/to/patient_split_balanced.json \
+    --out-dir results/
+\end{verbatim}
+
+This script loads the saved model and produces:
+\begin{itemize}[nosep]
+    \item \texttt{test\_metrics.json} -- AUROC, AUPRC, F1, Brier, ECE (before and after calibration), MC Dropout error-detection scores.
+    \item \texttt{test\_predictions.csv} -- Per-sample predictions.
+    \item \texttt{roc\_pr\_curves.png} -- ROC and Precision-Recall curves.
+    \item \texttt{reliability\_diagram.png} -- Calibration reliability diagram.
+\end{itemize}
+
+\subsection{Expected Test Results}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lccccc}
+\toprule
+Pipeline & AUROC & AUPRC & F1 & Brier & ECE \\
+\midrule
+Tuned CNN+LSTM & 0.797 & 0.189 & 0.189 & 0.0602 & 0.0497 \\
++ Temperature Scaling & 0.797 & 0.189 & 0.189 & 0.0565 & 0.0133 \\
++ MC Dropout ($M$=20) & 0.785 & 0.182 & 0.203 & 0.0601 & -- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\end{document}

@@ -6,7 +6,10 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
-from train_cnn_lstm import find_best_threshold, to_builtin
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
+
+from train import find_best_threshold, to_builtin
 from uq_mcdropout import (
     UNCERTAINTY_KEYS,
     binary_entropy,
