@@ -13,8 +13,6 @@ Usage:
     --split-file /path/to/patient_split_balanced.json \
     --out-dir results/
 """
-# GenAI Statement: Claude used in assistive role for code integration.
-# Evaluation logic and metrics verified manually by team.
 
 import argparse
 import csv
