@@ -20,6 +20,9 @@ from torch import nn
 from torch.utils.data import DataLoader, Dataset, WeightedRandomSampler
 from tqdm import tqdm
 
+# GenAI is only used as an auxiliary tool to improve code efficiency and optimize bugs.
+
+
 
 DEFAULT_PROCESSED_DIR = Path(r"D:\CHB-MIT-Data\processed")
 DEFAULT_SPLIT_FILE = Path(r"D:\CHB-MIT-Data\splits\patient_split.json")

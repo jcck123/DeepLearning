@@ -43,7 +43,8 @@ pip install mne==1.6.0 tqdm==4.66.1 scikit-learn==1.3.2
 ├── train.py                    # Main training entry point
 ├── test.py                     # Main evaluation entry point
 ├── saved_models/               # Trained model weights
-│   └── best_model.pt
+│   ├── best_model.pt
+│   └── metrics.json
 ├── src/
 │   ├── models/                 # CNN, CNN-LSTM, Deep Ensemble training
 │   ├── preprocessing/          # Data pipeline, preprocessing, splitting
@@ -60,19 +61,19 @@ pip install mne==1.6.0 tqdm==4.66.1 scikit-learn==1.3.2
 Download the raw EEG data (\textasciitilde42\,GB) from PhysioNet:
 
 \begin{verbatim}
-pip install awscli
-aws s3 sync --no-sign-request \
-    s3://physionet-open/chbmit/1.0.0/ \
-    /path/to/data/raw/
+python src/preprocessing/data_pipeline.py download \
+    --data-dir /path/to/data/raw
 \end{verbatim}
 
 \subsection{Step 2: Inspect and Clean}
 
 \begin{verbatim}
 python src/preprocessing/data_pipeline.py inspect \
-    --data-dir /path/to/data/raw
+    --data-dir /path/to/data/raw \
+    --report-dir /path/to/data/reports
 python src/preprocessing/data_pipeline.py clean \
-    --data-dir /path/to/data/raw
+    --data-dir /path/to/data/raw \
+    --report-dir /path/to/data/reports
 \end{verbatim}
 
 \subsection{Step 3: Preprocess}
@@ -89,8 +90,12 @@ This produces 115{,}330 windows (30\,s each, 18 channels, 256\,Hz) stored as \te
 \subsection{Step 4: Create Balanced Patient-level Split}
 
 \begin{verbatim}
-python src/preprocessing/make_balanced_split.py \
+python src/preprocessing/split.py \
     --processed-dir /path/to/data/processed
+
+python src/preprocessing/make_balanced_split.py \
+    --input-split /path/to/data/splits/patient_split.json \
+    --output-split /path/to/data/splits/patient_split_balanced.json
 \end{verbatim}
 
 Output: \texttt{patient\_split\_balanced.json} (18 train / 3 val / 3 test patients).
@@ -102,7 +107,7 @@ Output: \texttt{patient\_split\_balanced.json} (18 train / 3 val / 3 test patien
 \begin{verbatim}
 python train.py \
     --processed-dir /path/to/data/processed \
-    --split-file /path/to/patient_split_balanced.json \
+    --split-file /path/to/data/splits/patient_split_balanced.json \
     --out-dir saved_models/ \
     --seq-len 6 --seq-stride 2 \
     --epochs 12 --batch-size 4 \
@@ -111,6 +116,7 @@ python train.py \
 \end{verbatim}
 
 The best checkpoint is saved as \texttt{saved\_models/best\_model.pt} based on validation AUPRC.
+Training also writes \texttt{saved\_models/metrics.json}, which stores the saved hyperparameters and final validation/test metrics.
 
 \subsection{Step 6: Evaluate on Test Set}
 
@@ -118,17 +124,19 @@ The best checkpoint is saved as \texttt{saved\_models/best\_model.pt} based on v
 python test.py \
     --model-path saved_models/best_model.pt \
     --processed-dir /path/to/data/processed \
-    --split-file /path/to/patient_split_balanced.json \
+    --split-file /path/to/data/splits/patient_split_balanced.json \
     --out-dir results/
 \end{verbatim}
 
 This script loads the saved model and produces:
 \begin{itemize}[nosep]
-    \item \texttt{test\_metrics.json} -- AUROC, AUPRC, F1, Brier, ECE (before and after calibration), MC Dropout error-detection scores.
+    \item \texttt{test\_metrics.json} -- Deterministic test metrics, temperature-scaled test metrics, and MC Dropout summary metrics.
     \item \texttt{test\_predictions.csv} -- Per-sample predictions.
     \item \texttt{roc\_pr\_curves.png} -- ROC and Precision-Recall curves.
     \item \texttt{reliability\_diagram.png} -- Calibration reliability diagram.
 \end{itemize}
+
+MC Dropout error-detection AUROC/AUPRC for predictive entropy, standard deviation, and mutual information are printed to the terminal during evaluation.
 
 \subsection{Expected Test Results}
 

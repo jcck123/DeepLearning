@@ -4,6 +4,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+# GenAI is only used as an auxiliary tool to improve code efficiency and optimize bugs.
 
 
 DEFAULT_PROCESSED_DIR = Path(r"D:\CHB-MIT-Data\processed")

@@ -2,6 +2,7 @@ import argparse
 import json
 from itertools import combinations
 from pathlib import Path
+# GenAI is only used as an auxiliary tool to improve code efficiency and optimize bugs.
 
 
 DEFAULT_INPUT_SPLIT = Path(r"D:\CHB-MIT-Data\splits\patient_split.json")

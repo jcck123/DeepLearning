@@ -7,6 +7,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 import sys
+# GenAI is only used as an auxiliary tool to improve code efficiency and optimize bugs.
+
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from train import find_best_threshold, to_builtin

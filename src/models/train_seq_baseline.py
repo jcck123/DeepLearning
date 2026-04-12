@@ -29,8 +29,8 @@ Usage:
     --split-file /Volumes/T9/data/splits/patient_split.json \
     --save-dir /Volumes/T9/models
 """
-# GenAI Statement: Claude used in assistive role. Architecture and training logic
-# verified manually by team.
+# GenAI is only used as an auxiliary tool to improve code efficiency and optimize bugs.
+
 
 import os
 import json

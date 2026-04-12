@@ -18,6 +18,8 @@ from sklearn.metrics import (
     roc_auc_score,
 )
 
+# GenAI is only used as an auxiliary tool to improve code efficiency and optimize bugs.
+
 
 DEFAULT_RUN_DIR = Path(r"E:\CHB-MIT\runs\cnn_lstm_v2")
 

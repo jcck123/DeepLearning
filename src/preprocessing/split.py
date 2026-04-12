@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# GenAI is only used as an auxiliary tool to improve code efficiency and optimize bugs.
 
 import os
 import json

@@ -12,6 +12,8 @@ Usage:
     --processed-dir /path/to/processed \
     --split-file /path/to/patient_split_balanced.json \
     --out-dir results/
+
+GenAI is only used as an auxiliary tool to improve code efficiency and optimize bugs.
 """
 
 import argparse
@@ -24,6 +26,7 @@ import torch
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+from tqdm import tqdm
 
 from sklearn.calibration import calibration_curve
 from sklearn.metrics import (
@@ -57,6 +60,14 @@ def select_device(requested: str) -> torch.device:
     if requested == "cuda" and torch.cuda.is_available():
         return torch.device("cuda")
     if requested == "mps" and torch.backends.mps.is_available():
+        return torch.device("mps")
+    return torch.device("cpu")
+
+
+def select_auto_device() -> torch.device:
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    if torch.backends.mps.is_available():
         return torch.device("mps")
     return torch.device("cpu")
 
@@ -132,8 +143,9 @@ def mc_dropout_predict(model, loader, device, mc_samples=20):
     all_mean_probs, all_std_probs = [], []
     all_pred_entropy, all_mutual_info = [], []
 
+    progress = tqdm(loader, desc=f"MC Dropout (M={mc_samples})", dynamic_ncols=True)
     with torch.no_grad():
-        for inputs, labels, patient_ids, window_indices in loader:
+        for inputs, labels, patient_ids, window_indices in progress:
             inputs = inputs.to(device, non_blocking=True)
             logits_samples = []
             for _ in range(mc_samples):
@@ -157,6 +169,7 @@ def mc_dropout_predict(model, loader, device, mc_samples=20):
             all_pred_entropy.append(pred_entropy)
             all_mutual_info.append(mutual_info)
 
+    progress.close()
     model.eval()
     return {
         "labels": np.concatenate(all_labels).astype(np.int64),
@@ -287,7 +300,7 @@ def main():
     seq_stride = saved_args.get("seq_stride", 2)
 
     if args.device == "auto":
-        device = select_device("cuda")
+        device = select_auto_device()
     else:
         device = select_device(args.device)
     print(f"Device: {device}")

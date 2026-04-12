@@ -10,6 +10,9 @@ from datetime import datetime
 
 import numpy as np
 
+# GenAI is only used as an auxiliary tool to improve code efficiency and optimize bugs.
+
+
 # Config
 CHBMIT_URL = "https://physionet.org/files/chbmit/1.0.0/"
 ALL_CASES = [f"chb{i:02d}" for i in range(1, 25)]
